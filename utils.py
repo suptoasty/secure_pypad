@@ -30,7 +30,7 @@ class app(QApplication):
 	def openFile(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getOpenFileName(self.window,"QFileDialog.getOpenFileName()", "","All Files (*);;Python Files (*.py)", options=options)
+		file_name, _ = QFileDialog.getOpenFileName(self.window,"QFileDialog.getOpenFileName()", "","All Files (*);;Text Files (*.txt)", options=options)
 		if(file_name):
 			print(file_name)
 			file = open(file_name, 'r')
@@ -43,8 +43,8 @@ class app(QApplication):
 		file_name, _ = QFileDialog.getSaveFileName(self.window,"QFileDialog.getSaveFileName()","","All Files (*);;Text Files (*.txt)", options=options)
 		if(file_name):
 			print(file_name)
-			file = open(file_name, 'w')
-			file.write(self.text_edit.toPlainText())
+			file = open(file_name, 'wb')
+			file.write(bin(self.text_edit.toPlainText()))
 			file.close()
 
 	def __init__(self, args, title=None):
