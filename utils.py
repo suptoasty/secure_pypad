@@ -1,16 +1,49 @@
 #!/usr/bin/env python3
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QButtonGroup, QLabel, QMenuBar, QProgressBar, QFileDialog, QTextEdit, QVBoxLayout, QGridLayout, QMenu, QAction, QMessageBox, QLineEdit, QDialog, QDialogButtonBox, QInputDialog
 from PyQt5.QtGui import QIcon, QTextOption
-from PyQt5.Qt import QCryptographicHash as crypto
-import sys
-import types
+from PyQt5.Qt import QCryptographicHash, QByteArray
 import io
+from os import stat, remove
+import types
+import sys
+import json
+from Crypto.Hash import SHA256
+from base64 import b64encode, b64decode
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad, unpad
+
 
 class password_dialog(QDialog):
 	layout: QVBoxLayout = None
 	password: QLineEdit = None
 	confirm: QPushButton = None
 	cancel: QPushButton = None
+	pas: str = ""
+
+	def getPassword(self)-> str:
+		return self.pas
+
+	def on_confirm(self):
+		if(self.password.text() == ""):
+			warn: QMessageBox = QMessageBox(parent=self)
+			warn.setText("Password Invalid")
+			warn.show()
+			return
+		# cc = QCryptographicHash(QCryptographicHash.Sha256)
+		# self.pas = cc.hash()
+		# print(h.hexdigest())
+		self.pas = self.password.text()
+
+		self.password.setText("")
+		self.accept()
+		print("Accepted")
+
+	def on_cancel(self):
+		self.password.setText("")
+		self.reject()
+		print("Rejected")
 
 	def __init__(self):
 		QMessageBox.__init__(self)
@@ -32,7 +65,9 @@ class password_dialog(QDialog):
 		self.password.setEchoMode(QLineEdit.Password)
 
 		self.setModal(True)
-		
+		self.confirm.clicked.connect(self.on_confirm)
+		self.cancel.clicked.connect(self.on_cancel)
+
 
 class app(QApplication):
 	menu: QMenuBar = None
@@ -62,35 +97,71 @@ class app(QApplication):
 	def openFile(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getOpenFileName(self.window,"QFileDialog.getOpenFileName()", "","All Files (*);;Text Files (*.txt)", options=options)
+		file_name, _ = QFileDialog.getOpenFileName(
+			self.window, "QFileDialog.getOpenFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
 		if(file_name):
 			print(file_name)
 			file = open(file_name, 'rb')
 			self.text_edit.setText(file.read().decode("utf-8"))
 			file.close()
 
+	def openFileEncrypted(self, password):
+		options = QFileDialog.Options()
+		options |= QFileDialog.DontUseNativeDialog
+		file_name, _ = QFileDialog.getOpenFileName(
+			self.window, "QFileDialog.getOpenFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
+		if(file_name):
+			print(file_name)
+			err = self.password_dialog.exec()
+			if(err):
+				try:
+					password = self.password_dialog.getPassword()
+					key = pad(bytes(password, 'utf-8'), 16)
+					b64 = json.loads(open(file_name, 'rb').read())
+					iv = b64decode(b64['iv'])
+					ct = b64decode(b64['ciphertext'])
+					cipher = AES.new(key, AES.MODE_CBC, iv)
+					pt = unpad(cipher.decrypt(ct), AES.block_size)
+					pt = pt.decode('utf-8')
+					self.text_edit.setText(pt)
+				except ValueError:
+					print("Inccorrect Decrypt")
+				# file_in = open(file_name, "rb")
+				# nonce, tag, ciphertext = [file_in.read(x) for x in (16, 16, -1)]
+
+				# cipher = AES.new(key, AES.MODE_CBC, nonce)
+				# data = cipher.decrypt_and_verify(ciphertext, tag)
+				# self.text_edit.setText(data)
+
+			password = ""
+			file_name = ""
+
 	def saveFile(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getSaveFileName(self.window,"QFileDialog.getSaveFileName()","","All Files (*);;Text Files (*.txt)", options=options)
+		file_name, _ = QFileDialog.getSaveFileName(
+			self.window, "QFileDialog.getSaveFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
 		if(file_name):
 			print(file_name)
 			file = open(file_name, 'wb')
 			file.write(bytes(self.text_edit.toPlainText(), "utf-8"))
 			file.close()
-	
+
 	def saveFileEncrpted(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getSaveFileName(self.window,"QFileDialog.getSaveFileName()","","All Files (*);;Text Files (*.txt)", options=options)
+		file_name, _ = QFileDialog.getSaveFileName(
+			self.window, "QFileDialog.getSaveFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
 		if(file_name):
 			# self.password_dialog.show()
-			self.password_dialog.exec()
-			print(file_name)
-			file = open(file_name, 'wb')
-			file.write(bytes(self.text_edit.toPlainText(), "utf-8"))
-			file.close()
-	
+			err = self.password_dialog.exec()
+			if(err):
+				print("write encrpted")
+				self.writeEncrptedFile(file_name, self.password_dialog.getPassword())
+			else:
+				print("canceled")
+			file_name = ""
+
 	def toggleWordWrap(self):
 		self.word_wrap != self.word_wrap
 		if(self.word_wrap):
@@ -98,6 +169,30 @@ class app(QApplication):
 			self.text_edit.setLineWrapColumnOrWidth(1)
 		else:
 			self.text_edit.setLineWrapColumnOrWidth(0)
+
+	def writeEncrptedFile(self, filename, password=None):
+		if(password is None):
+			password = "foo"
+		print("Encrpteded: ", filename)
+
+		data = bytes(self.text_edit.toPlainText(), 'utf-8')
+		key = pad(bytes(password, 'utf-8'), 16)
+		cipher = AES.new(key, AES.MODE_CBC)
+		ct_bytes = cipher.encrypt(pad(data, AES.block_size))
+		iv = b64encode(cipher.iv).decode('utf-8')
+		ct = b64encode(ct_bytes).decode('utf-8')
+		result = json.dumps({'iv':iv, 'ciphertext':ct})
+		# ciphertext, tag = cipher.encrypt_and_digest(data)
+
+		file_out = open(filename, "wb")
+		# [file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
+		# [file_out.write(x) for x in (result)]
+		file_out.write(bytes(result, 'utf-8'))
+
+		key = None
+		data = None
+		password = None
+		filename = None
 
 	def __init__(self, args, title=None):
 		QApplication.__init__(self, args)
@@ -110,7 +205,7 @@ class app(QApplication):
 		self.password_dialog = QLineEdit()
 		self.text_edit = QTextEdit()
 		self.file_chooser = QFileDialog()
-		
+
 		self.window.setWindowTitle(title)
 		self.password_dialog = password_dialog()
 
@@ -126,6 +221,11 @@ class app(QApplication):
 		openAction = QAction(QIcon(), "&Open", self)
 		openAction.setShortcut("Ctrl+O")
 		openAction.triggered.connect(self.openFile)
+		actionFile.addAction(openAction)
+
+		openAction = QAction(QIcon(), "&Open Encrypted", self)
+		openAction.setShortcut("Ctrl+Alt+O")
+		openAction.triggered.connect(self.openFileEncrypted)
 		actionFile.addAction(openAction)
 
 		saveAction = QAction(QIcon(), "&Save", self)
