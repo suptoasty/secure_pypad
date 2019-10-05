@@ -97,36 +97,62 @@ class app(QApplication):
 	def openFile(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getOpenFileName(
+		filename, _ = QFileDialog.getOpenFileName(
 			self.window, "QFileDialog.getOpenFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
-		if(file_name):
-			print(file_name)
-			file = open(file_name, 'rb')
-			self.text_edit.setText(file.read().decode("utf-8"))
-			file.close()
+		open_encrypt = False
+		if(filename):
+			print(filename)
+			file = open(filename, 'rb')
+			data = file.read()
+			try:
+				result = json.loads(data)
+				open_encrypt = result["encrypt"]
+			except ValueError:
+				open_encrypt = False
+
+			if(open_encrypt):
+				file.close()
+				self.openEncryptedFile(filename)
+			else:
+				self.text_edit.setText(data.decode('utf-8'))
+				file.close()
+		
 
 	def openFileEncrypted(self, password):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getOpenFileName(
+		filename, _ = QFileDialog.getOpenFileName(
 			self.window, "QFileDialog.getOpenFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
-		if(file_name):
-			print(file_name)
+		if(filename):
+			print(filename)
 			err = self.password_dialog.exec()
 			if(err):
 				try:
+					file_in = open(filename, 'rb')
 					password = self.password_dialog.getPassword()
 					key = pad(bytes(password, 'utf-8'), 16)
-					b64 = json.loads(open(file_name, 'rb').read())
+					b64 = json.loads(file_in.read())
 					iv = b64decode(b64['iv'])
 					ct = b64decode(b64['ciphertext'])
 					cipher = AES.new(key, AES.MODE_CBC, iv)
 					pt = unpad(cipher.decrypt(ct), AES.block_size)
 					pt = pt.decode('utf-8')
 					self.text_edit.setText(pt)
+					file_in.close()
+				except KeyError:
+					print("Key Error")
 				except ValueError:
 					print("Inccorrect Decrypt")
-				# file_in = open(file_name, "rb")
+				password = ""
+				key = None
+				b64 = None
+				iv = None
+				ct = None
+				cipher = None
+				pt = None
+				self.password_dialog.pas = ""
+				filename = ""
+				# file_in = open(filename, "rb")
 				# nonce, tag, ciphertext = [file_in.read(x) for x in (16, 16, -1)]
 
 				# cipher = AES.new(key, AES.MODE_CBC, nonce)
@@ -134,33 +160,33 @@ class app(QApplication):
 				# self.text_edit.setText(data)
 
 			password = ""
-			file_name = ""
+			filename = ""
 
 	def saveFile(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getSaveFileName(
+		filename, _ = QFileDialog.getSaveFileName(
 			self.window, "QFileDialog.getSaveFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
-		if(file_name):
-			print(file_name)
-			file = open(file_name, 'wb')
+		if(filename):
+			print(filename)
+			file = open(filename, 'wb')
 			file.write(bytes(self.text_edit.toPlainText(), "utf-8"))
 			file.close()
 
 	def saveFileEncrpted(self):
 		options = QFileDialog.Options()
 		options |= QFileDialog.DontUseNativeDialog
-		file_name, _ = QFileDialog.getSaveFileName(
+		filename, _ = QFileDialog.getSaveFileName(
 			self.window, "QFileDialog.getSaveFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
-		if(file_name):
+		if(filename):
 			# self.password_dialog.show()
 			err = self.password_dialog.exec()
 			if(err):
 				print("write encrpted")
-				self.writeEncrptedFile(file_name, self.password_dialog.getPassword())
+				self.writeEncrptedFile(filename, self.password_dialog.getPassword())
 			else:
 				print("canceled")
-			file_name = ""
+			filename = ""
 
 	def toggleWordWrap(self):
 		self.word_wrap != self.word_wrap
@@ -181,18 +207,53 @@ class app(QApplication):
 		ct_bytes = cipher.encrypt(pad(data, AES.block_size))
 		iv = b64encode(cipher.iv).decode('utf-8')
 		ct = b64encode(ct_bytes).decode('utf-8')
-		result = json.dumps({'iv':iv, 'ciphertext':ct})
+		result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True})
 		# ciphertext, tag = cipher.encrypt_and_digest(data)
 
 		file_out = open(filename, "wb")
 		# [file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
 		# [file_out.write(x) for x in (result)]
 		file_out.write(bytes(result, 'utf-8'))
+		file_out.close()
 
 		key = None
 		data = None
-		password = None
-		filename = None
+		password = ""
+		filename = ""
+		iv = None
+		ct = None
+		result = None
+
+	def openEncryptedFile(self, filename, password=None):
+		err = self.password_dialog.exec()
+		if(err):
+			try:
+				file_in = open(filename, 'rb')
+				password = self.password_dialog.getPassword()
+				key = pad(bytes(password, 'utf-8'), 16)
+				b64 = json.loads(file_in.read())
+				iv = b64decode(b64['iv'])
+				ct = b64decode(b64['ciphertext'])
+				cipher = AES.new(key, AES.MODE_CBC, iv)
+				pt = unpad(cipher.decrypt(ct), AES.block_size)
+				pt = pt.decode('utf-8')
+				self.text_edit.setText(pt)
+				file_in.close()
+			except KeyError:
+				print("Key Error")
+			except ValueError:
+				print("Inccorrect Decrypt")
+			password = ""
+			key = None
+			b64 = None
+			iv = None
+			ct = None
+			cipher = None
+			pt = None
+			self.password_dialog.pas = ""
+			filename = ""
+		password = ""
+		filename = ""
 
 	def __init__(self, args, title=None):
 		QApplication.__init__(self, args)
