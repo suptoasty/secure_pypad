@@ -22,6 +22,11 @@ class password_dialog(QDialog):
 	cancel: QPushButton = None
 	pas: str = ""
 
+	def hash_pass(self, pas)-> bytes:
+		sha = SHA256.new()
+		sha.update(bytes(pas, 'utf-8'))
+		return sha.digest()
+
 	def getPassword(self)-> str:
 		return self.pas
 
@@ -31,10 +36,7 @@ class password_dialog(QDialog):
 			warn.setText("Password Invalid")
 			warn.show()
 			return
-		# cc = QCryptographicHash(QCryptographicHash.Sha256)
-		# self.pas = cc.hash()
-		# print(h.hexdigest())
-		self.pas = self.password.text()
+		self.pas = self.hash_pass(self.password.text())
 
 		self.password.setText("")
 		self.accept()
@@ -115,8 +117,7 @@ class app(QApplication):
 				self.openEncryptedFile(filename)
 			else:
 				self.text_edit.setText(data.decode('utf-8'))
-				file.close()
-		
+				file.close()		
 
 	def openFileEncrypted(self, password):
 		options = QFileDialog.Options()
@@ -126,35 +127,6 @@ class app(QApplication):
 		if(filename):
 			print(filename)
 			self.openEncryptedFile(filename)
-			# err = self.password_dialog.exec()
-			# if(err):
-			# 	try:
-			# 		file_in = open(filename, 'rb')
-			# 		password = self.password_dialog.getPassword()
-			# 		key = pad(bytes(password, 'utf-8'), 16)
-			# 		b64 = json.loads(file_in.read())
-			# 		iv = b64decode(b64['iv'])
-			# 		ct = b64decode(b64['ciphertext'])
-			# 		cipher = AES.new(key, AES.MODE_CBC, iv)
-			# 		pt = unpad(cipher.decrypt(ct), AES.block_size)
-			# 		pt = pt.decode('utf-8')
-			# 		self.text_edit.setText(pt)
-			# 		file_in.close()
-			# 	except KeyError:
-			# 		print("Key Error")
-			# 	except ValueError:
-			# 		print("Inccorrect Decrypt")
-			# 	password = ""
-			# 	key = None
-			# 	b64 = None
-			# 	iv = None
-			# 	ct = None
-			# 	cipher = None
-			# 	pt = None
-			# 	self.password_dialog.pas = ""
-			# 	filename = ""
-			# password = ""
-			# filename = ""
 
 	def saveFile(self):
 		options = QFileDialog.Options()
@@ -196,8 +168,10 @@ class app(QApplication):
 		print("Encrpteded: ", filename)
 
 		data = bytes(self.text_edit.toPlainText(), 'utf-8')
-		key = pad(bytes(password, 'utf-8'), 16)
-		cipher = AES.new(key, AES.MODE_CBC)
+		# key = pad(bytes(password, 'utf-8'), 16)
+		# key = self.hash_pass(password)
+		key = password
+		cipher = AES.new(key , AES.MODE_CBC)
 		ct_bytes = cipher.encrypt(pad(data, AES.block_size))
 		iv = b64encode(cipher.iv).decode('utf-8')
 		ct = b64encode(ct_bytes).decode('utf-8')
@@ -223,8 +197,9 @@ class app(QApplication):
 		if(err):
 			try:
 				file_in = open(filename, 'rb')
-				password = self.password_dialog.getPassword()
-				key = pad(bytes(password, 'utf-8'), 16)
+				key = self.password_dialog.getPassword()
+				# key = pad(bytes(password, 'utf-8'), 16)
+				# key = password
 				b64 = json.loads(file_in.read())
 				iv = b64decode(b64['iv'])
 				ct = b64decode(b64['ciphertext'])
@@ -248,6 +223,11 @@ class app(QApplication):
 			filename = ""
 		password = ""
 		filename = ""
+
+	def hash_pass(self, pas)-> bytes:
+		sha = SHA256.new()
+		sha.update(bytes(pas, 'utf-8'))
+		return sha.digest()
 
 	def __init__(self, args, title=None):
 		QApplication.__init__(self, args)
