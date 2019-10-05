@@ -125,42 +125,36 @@ class app(QApplication):
 			self.window, "QFileDialog.getOpenFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
 		if(filename):
 			print(filename)
-			err = self.password_dialog.exec()
-			if(err):
-				try:
-					file_in = open(filename, 'rb')
-					password = self.password_dialog.getPassword()
-					key = pad(bytes(password, 'utf-8'), 16)
-					b64 = json.loads(file_in.read())
-					iv = b64decode(b64['iv'])
-					ct = b64decode(b64['ciphertext'])
-					cipher = AES.new(key, AES.MODE_CBC, iv)
-					pt = unpad(cipher.decrypt(ct), AES.block_size)
-					pt = pt.decode('utf-8')
-					self.text_edit.setText(pt)
-					file_in.close()
-				except KeyError:
-					print("Key Error")
-				except ValueError:
-					print("Inccorrect Decrypt")
-				password = ""
-				key = None
-				b64 = None
-				iv = None
-				ct = None
-				cipher = None
-				pt = None
-				self.password_dialog.pas = ""
-				filename = ""
-				# file_in = open(filename, "rb")
-				# nonce, tag, ciphertext = [file_in.read(x) for x in (16, 16, -1)]
-
-				# cipher = AES.new(key, AES.MODE_CBC, nonce)
-				# data = cipher.decrypt_and_verify(ciphertext, tag)
-				# self.text_edit.setText(data)
-
-			password = ""
-			filename = ""
+			self.openEncryptedFile(filename)
+			# err = self.password_dialog.exec()
+			# if(err):
+			# 	try:
+			# 		file_in = open(filename, 'rb')
+			# 		password = self.password_dialog.getPassword()
+			# 		key = pad(bytes(password, 'utf-8'), 16)
+			# 		b64 = json.loads(file_in.read())
+			# 		iv = b64decode(b64['iv'])
+			# 		ct = b64decode(b64['ciphertext'])
+			# 		cipher = AES.new(key, AES.MODE_CBC, iv)
+			# 		pt = unpad(cipher.decrypt(ct), AES.block_size)
+			# 		pt = pt.decode('utf-8')
+			# 		self.text_edit.setText(pt)
+			# 		file_in.close()
+			# 	except KeyError:
+			# 		print("Key Error")
+			# 	except ValueError:
+			# 		print("Inccorrect Decrypt")
+			# 	password = ""
+			# 	key = None
+			# 	b64 = None
+			# 	iv = None
+			# 	ct = None
+			# 	cipher = None
+			# 	pt = None
+			# 	self.password_dialog.pas = ""
+			# 	filename = ""
+			# password = ""
+			# filename = ""
 
 	def saveFile(self):
 		options = QFileDialog.Options()
