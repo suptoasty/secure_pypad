@@ -250,9 +250,10 @@ class app(QApplication):
 		elif(mode == AES.MODE_OPENPGP):
 			cipher = AES.new(key, AES.MODE_OPENPGP)
 			ct_bytes = cipher.encrypt(data)
+			encr_iv = b64encode(cipher._encrypted_IV).decode("utf-8")
 			iv = b64encode(cipher.iv).decode("utf-8")
 			ct = b64encode(ct_bytes).decode("utf-8")
-			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+			result = json.dumps({'iv':encr_iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
 
 			file_out = open(filename, "wb")
 			file_out.write(bytes(result, 'utf-8'))
