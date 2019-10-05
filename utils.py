@@ -21,6 +21,10 @@ class password_dialog(QDialog):
 	confirm: QPushButton = None
 	cancel: QPushButton = None
 	pas: str = ""
+	encryption_mode = AES.MODE_CBC
+
+	def getEncryptionMode(self):
+		return self.encryption_mode
 
 	def hash_pass(self, pas)-> bytes:
 		sha = SHA256.new()
@@ -163,27 +167,25 @@ class app(QApplication):
 			self.text_edit.setLineWrapColumnOrWidth(0)
 
 	def writeEncrptedFile(self, filename, password=None):
-		if(password is None):
-			password = "foo"
+		#comment out as hash_pass is being used "foo" will not work
+		# if(password is None):
+		# 	password = "foo"
 		print("Encrpteded: ", filename)
 
 		data = bytes(self.text_edit.toPlainText(), 'utf-8')
-		# key = pad(bytes(password, 'utf-8'), 16)
-		# key = self.hash_pass(password)
 		key = password
 		cipher = AES.new(key , AES.MODE_CBC)
 		ct_bytes = cipher.encrypt(pad(data, AES.block_size))
 		iv = b64encode(cipher.iv).decode('utf-8')
 		ct = b64encode(ct_bytes).decode('utf-8')
-		result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True})
-		# ciphertext, tag = cipher.encrypt_and_digest(data)
+		mode = self.password_dialog.getEncryptionMode()
+		result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
 
 		file_out = open(filename, "wb")
-		# [file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
-		# [file_out.write(x) for x in (result)]
 		file_out.write(bytes(result, 'utf-8'))
 		file_out.close()
 
+		mode = 0
 		key = None
 		data = None
 		password = ""
