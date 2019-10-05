@@ -248,7 +248,11 @@ class app(QApplication):
 			file_out.close()
 			print("OFB")
 		elif(mode == AES.MODE_OPENPGP):
-			result = json.dumps({"nonce":nonce, 'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+			cipher = AES.new(key, AES.MODE_OPENPGP)
+			ct_bytes = cipher.encrypt(data)
+			iv = b64encode(cipher.iv).decode("utf-8")
+			ct = b64encode(ct_bytes).decode("utf-8")
+			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
 
 			file_out = open(filename, "wb")
 			file_out.write(bytes(result, 'utf-8'))
@@ -314,7 +318,8 @@ class app(QApplication):
 					self.text_edit.setText(pt)
 					file_in.close()
 				elif(mode == AES.MODE_OPENPGP):
-					nonce = b64decode(b64["nonce"])
+					iv = b64decode(b64['iv'])
+					# nonce = b64decode(b64["nonce"])
 					ct = b64decode(b64["ciphertext"])
 					cipher = AES.new(key, AES.MODE_OPENPGP, iv=iv)
 					pt = cipher.decrypt(ct).decode("utf-8")
