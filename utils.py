@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QButtonGroup, QLabel, QMenuBar, QProgressBar, QFileDialog, QTextEdit, QVBoxLayout, QGridLayout, QMenu, QAction, QMessageBox, QLineEdit, QDialog, QDialogButtonBox, QInputDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QButtonGroup, QLabel, QMenuBar, QProgressBar, QFileDialog, QTextEdit, QVBoxLayout, QGridLayout, QMenu, QAction, QMessageBox, QLineEdit, QDialog, QDialogButtonBox, QInputDialog, QRadioButton
 from PyQt5.QtGui import QIcon, QTextOption
 from PyQt5.Qt import QCryptographicHash, QByteArray
 import io
@@ -22,6 +22,16 @@ class password_dialog(QDialog):
 	cancel: QPushButton = None
 	pas: str = ""
 	encryption_mode = AES.MODE_CBC
+	encryption_mode_group: QButtonGroup = None
+	cbc = None
+	ctr = None
+	cfb = None
+	ofb = None
+	pgp = None
+	# encryption_selector: QRadioButton = None
+
+	def on_encryption_mode_changed(self, mode=AES.MODE_CBC):
+		self.encryption_mode = mode
 
 	def getEncryptionMode(self):
 		return self.encryption_mode
@@ -58,6 +68,18 @@ class password_dialog(QDialog):
 		self.password = QLineEdit()
 		self.confirm = QPushButton()
 		self.cancel = QPushButton()
+		self.encryption_mode_group = QButtonGroup()
+		self.cbc = QRadioButton("CBC")
+		self.ctr = QRadioButton("CTR")
+		self.cfb = QRadioButton("CFB")
+		self.ofb = QRadioButton("OFB")
+		self.pgp = QRadioButton("PGP")
+
+		self.cbc.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CBC))
+		self.ctr.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CTR))
+		self.cfb.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CFB))
+		self.ofb.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_OFB))
+		self.pgp.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_OPENPGP))
 
 		self.password.setText("")
 		self.confirm.setText("Confirm")
@@ -66,6 +88,13 @@ class password_dialog(QDialog):
 		self.layout.addWidget(self.password)
 		self.layout.addWidget(self.confirm)
 		self.layout.addWidget(self.cancel)
+
+		self.layout.addWidget(self.cbc)
+		self.layout.addWidget(self.ctr)
+		self.layout.addWidget(self.cfb)
+		self.layout.addWidget(self.ofb)
+		self.layout.addWidget(self.pgp)
+		# self.layout.addWidget(self.encryption_mode_group)
 		self.setLayout(self.layout)
 
 		self.password.setEchoMode(QLineEdit.Password)
@@ -171,19 +200,70 @@ class app(QApplication):
 		# if(password is None):
 		# 	password = "foo"
 		print("Encrpteded: ", filename)
-
+		mode = self.password_dialog.getEncryptionMode()
 		data = bytes(self.text_edit.toPlainText(), 'utf-8')
 		key = password
-		cipher = AES.new(key , AES.MODE_CBC)
-		ct_bytes = cipher.encrypt(pad(data, AES.block_size))
-		iv = b64encode(cipher.iv).decode('utf-8')
-		ct = b64encode(ct_bytes).decode('utf-8')
-		mode = self.password_dialog.getEncryptionMode()
-		result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+		if(mode == AES.MODE_CBC):
+			cipher = AES.new(key , AES.MODE_CBC)
+			ct_bytes = cipher.encrypt(pad(data, AES.block_size))
+			iv = b64encode(cipher.iv).decode('utf-8')
+			ct = b64encode(ct_bytes).decode('utf-8')
+			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
 
-		file_out = open(filename, "wb")
-		file_out.write(bytes(result, 'utf-8'))
-		file_out.close()
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, 'utf-8'))
+			file_out.close()
+			print("CBC")
+		elif(mode == AES.MODE_CTR):
+			cipher = AES.new(key, AES.MODE_CTR)
+			ct_bytes = cipher.encrypt(data)
+			nonce = b64encode(cipher.nonce).decode("utf-8")
+			ct = b64encode(ct_bytes).decode("utf-8")
+			result = json.dumps({"nonce":nonce, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, 'utf-8'))
+			file_out.close()
+			print("CTR")
+		elif(mode == AES.MODE_CFB):
+			cipher = AES.new(key, AES.MODE_CFB)
+			ct_bytes = cipher.encrypt(data)
+			iv = b64encode(cipher.iv).decode("utf-8")
+			ct = b64encode(ct_bytes).decode("utf-8")
+			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, 'utf-8'))
+			file_out.close()
+			print("CFB")
+		elif(mode == AES.MODE_OFB):
+			cipher = AES.new(key, AES.MODE_OFB)
+			ct_bytes = cipher.encrpyt(data)
+			iv = b64encode(cipher.iv).decode("utf-8")
+			ct = b64encode(ct_bytes).decode("utf-8")
+			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, 'utf-8'))
+			file_out.close()
+			print("OFB")
+		elif(mode == AES.MODE_OPENPGP):
+			result = json.dumps({"nonce":nonce, 'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
+
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, 'utf-8'))
+			file_out.close()
+			print("OPENGPG")
+		elif(mode == AES.MODE_CCM):
+			pass
+		elif(mode == AES.MODE_EAX):
+			pass
+		elif(mode == AES.MODE_GCM):
+			pass
+		elif(mode == AES.MODE_OCB):
+			pass
+		elif(mode == AES.MODE_SIV):
+			pass
 
 		mode = 0
 		key = None
@@ -200,16 +280,54 @@ class app(QApplication):
 			try:
 				file_in = open(filename, 'rb')
 				key = self.password_dialog.getPassword()
-				# key = pad(bytes(password, 'utf-8'), 16)
-				# key = password
 				b64 = json.loads(file_in.read())
-				iv = b64decode(b64['iv'])
-				ct = b64decode(b64['ciphertext'])
-				cipher = AES.new(key, AES.MODE_CBC, iv)
-				pt = unpad(cipher.decrypt(ct), AES.block_size)
-				pt = pt.decode('utf-8')
-				self.text_edit.setText(pt)
-				file_in.close()
+				mode = b64["mode"]
+				if(mode == AES.MODE_CBC):
+					iv = b64decode(b64['iv'])
+					ct = b64decode(b64['ciphertext'])
+					cipher = AES.new(key, AES.MODE_CBC, iv)
+					pt = unpad(cipher.decrypt(ct), AES.block_size)
+					pt = pt.decode('utf-8')
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_CTR):
+					nonce = b64decode(b64['nonce'])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_CFB):
+					nonce = b64decode(b64["nonce"])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_CFB, iv=iv)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_OFB):
+					nonce = b64decode(b64["nonce"])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_OFB, iv=iv)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_OPENPGP):
+					nonce = b64decode(b64["nonce"])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_OPENPGP, iv=iv)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_CCM):
+					pass
+				elif(mode == AES.MODE_EAX):
+					pass
+				elif(mode == AES.MODE_GCM):
+					pass
+				elif(mode == AES.MODE_OCB):
+					pass
+				elif(mode == AES.MODE_SIV):
+					pass
 			except KeyError:
 				print("Key Error")
 			except ValueError:
