@@ -238,7 +238,7 @@ class app(QApplication):
 			print("CFB")
 		elif(mode == AES.MODE_OFB):
 			cipher = AES.new(key, AES.MODE_OFB)
-			ct_bytes = cipher.encrpyt(data)
+			ct_bytes = cipher.encrypt(data)
 			iv = b64encode(cipher.iv).decode("utf-8")
 			ct = b64encode(ct_bytes).decode("utf-8")
 			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
@@ -298,6 +298,7 @@ class app(QApplication):
 					self.text_edit.setText(pt)
 					file_in.close()
 				elif(mode == AES.MODE_CFB):
+					iv = b64decode(b64['iv'])
 					nonce = b64decode(b64["nonce"])
 					ct = b64decode(b64["ciphertext"])
 					cipher = AES.new(key, AES.MODE_CFB, iv=iv)
