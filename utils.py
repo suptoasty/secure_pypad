@@ -27,9 +27,8 @@ class password_dialog(QDialog):
 	ctr = None
 	cfb = None
 	ofb = None
-	# pgp = None
 	eax = None
-	# encryption_selector: QRadioButton = None
+	gcm = None
 
 	def on_encryption_mode_changed(self, mode=AES.MODE_CBC):
 		self.encryption_mode = mode
@@ -74,15 +73,15 @@ class password_dialog(QDialog):
 		self.ctr = QRadioButton("CTR")
 		self.cfb = QRadioButton("CFB")
 		self.ofb = QRadioButton("OFB")
-		# self.pgp = QRadioButton("PGP")
 		self.eax = QRadioButton("EAX")
+		self.gcm = QRadioButton("GCM")
 
 		self.cbc.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CBC))
 		self.ctr.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CTR))
 		self.cfb.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_CFB))
 		self.ofb.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_OFB))
-		# self.pgp.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_OPENPGP))
 		self.eax.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_EAX))
+		self.gcm.toggled.connect(lambda:self.on_encryption_mode_changed(AES.MODE_GCM))
 
 		self.password.setText("")
 		self.confirm.setText("Confirm")
@@ -96,9 +95,8 @@ class password_dialog(QDialog):
 		self.layout.addWidget(self.ctr)
 		self.layout.addWidget(self.cfb)
 		self.layout.addWidget(self.ofb)
-		# self.layout.addWidget(self.pgp)
 		self.layout.addWidget(self.eax)
-		# self.layout.addWidget(self.encryption_mode_group)
+		self.layout.addWidget(self.gcm)
 		self.setLayout(self.layout)
 
 		self.password.setEchoMode(QLineEdit.Password)
@@ -183,10 +181,9 @@ class app(QApplication):
 		filename, _ = QFileDialog.getSaveFileName(
 			self.window, "QFileDialog.getSaveFileName()", "", "All Files (*);;Text Files (*.txt)", options=options)
 		if(filename):
-			# self.password_dialog.show()
 			err = self.password_dialog.exec()
 			if(err):
-				print("write encrpted")
+				print("write encrypted")
 				self.writeEncrptedFile(filename, self.password_dialog.getPassword())
 			else:
 				print("canceled")
@@ -195,7 +192,6 @@ class app(QApplication):
 	def toggleWordWrap(self):
 		self.word_wrap != self.word_wrap
 		if(self.word_wrap):
-			# self.text_edit.setLineWrapMode(self, QTextOption.WrapAnywhere)
 			self.text_edit.setLineWrapColumnOrWidth(1)
 		else:
 			self.text_edit.setLineWrapColumnOrWidth(0)
@@ -216,7 +212,8 @@ class app(QApplication):
 			result = json.dumps({'iv':iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
 
 			file_out = open(filename, "wb")
-			file_out.write(bytes(result, 'utf-8'))
+			file_out.write(bytes(result, "utf-8"))
+			# [file_out.write(x) for x in (cipher.iv, ct_bytes,)]
 			file_out.close()
 			print("CBC")
 		elif(mode == AES.MODE_CTR):
@@ -250,29 +247,29 @@ class app(QApplication):
 
 			file_out = open(filename, "wb")
 			file_out.write(bytes(result, 'utf-8'))
+			# [file_out.write(x) for x in ()]
 			file_out.close()
 			print("OFB")
-		# elif(mode == AES.MODE_OPENPGP):
-		# 	cipher = AES.new(key, AES.MODE_OPENPGP)
-		# 	ct_bytes = cipher.encrypt(data)
-		# 	encr_iv = b64encode(cipher._cipher.IV).decode("utf-8")
-		# 	iv = b64encode(cipher.iv).decode("utf-8")
-		# 	ct = b64encode(ct_bytes).decode("utf-8")
-		# 	result = json.dumps({'iv':encr_iv, 'ciphertext':ct, 'encrypt': True, 'mode': mode})
-
-		# 	file_out = open(filename, "wb")
-		# 	file_out.write(bytes(result, 'utf-8'))
-		# 	file_out.close()
-		# 	print("OPENGPG")
 		elif(mode == AES.MODE_EAX):
 			cipher = AES.new(key, AES.MODE_EAX)
 			ciphertext, tag = cipher.encrypt_and_digest(data)
-			# result = json.dumps({'nonce':cipher.nonce, 'tag': tag, 'ciphertext':ciphertext, 'encrypt': True, 'mode': mode})
-			
+
 			file_out = open(filename, "wb")
-			# file_out.write(bytes(result, 'utf-8'))
 			[file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
 			file_out.close()
+		elif(mode == AES.MODE_GCM):
+			header = b"header"
+			cipher = AES.new(key, AES.MODE_GCM)
+			cipher.update(header)
+			ciphertext, tag = cipher.encrypt_and_digest(data)
+
+			result = json.dumps({"header":header.decode("utf-8"), "nonce":b64encode(cipher.nonce).decode("utf-8"), "ciphertext":b64encode(ciphertext).decode("utf-8"), "tag": b64encode(tag).decode("utf-8"), "encrypt": True, "mode": mode})
+
+			file_out = open(filename, "wb")
+			file_out.write(bytes(result, "utf-8"))
+			file_out.close()
+			header = ""
+			tag = ""
 		mode = 0
 		key = None
 		data = None
@@ -328,14 +325,18 @@ class app(QApplication):
 						pt = cipher.decrypt(ct).decode("utf-8")
 						self.text_edit.setText(pt)
 						file_in.close()
-					# elif(mode == AES.MODE_OPENPGP):
-					# 	iv = b64decode(b64['iv'])
-					# 	# nonce = b64decode(b64["nonce"])
-					# 	ct = b64decode(b64["ciphertext"])
-					# 	cipher = AES.new(key, AES.MODE_OPENPGP, iv=iv)
-					# 	pt = cipher.decrypt(ct).decode("utf-8")
-					# 	self.text_edit.setText(pt)
-					# 	file_in.close()
+					elif(mode == AES.MODE_GCM):
+						# json_k = ["nonce", "header", "ciphertext", "tag"]
+						# jv = {k:b64decode(b64[k]) for k in json_k}
+						header = b64["header"].encode("utf-8")
+						tag = b64decode(b64["tag"])
+						nonce = b64decode(b64['nonce'])
+						ciphertext = b64decode(b64["ciphertext"])
+						cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+						cipher.update(header)
+						pt = cipher.decrypt_and_verify(ciphertext, tag)
+						self.text_edit.setText(pt.decode("utf-8"))
+						file_in.close()
 			except KeyError:
 				print("Key Error")
 			except ValueError:
