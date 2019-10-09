@@ -270,7 +270,13 @@ class app(QApplication):
 			file_out.close()
 			header = ""
 			tag = ""
+		b64 = None
+		cipher = None
+		pt = None
+		self.password_dialog.pas = ""
 		mode = 0
+		tag = ""
+		header = ""
 		key = None
 		data = None
 		password = ""
