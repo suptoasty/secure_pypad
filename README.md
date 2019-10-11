@@ -14,5 +14,4 @@ Currently only AES is used and 5 modes are selectable, 4 work (NEED TO FIX OPENP
 * opening an encrypted file with normal open, checks if file is encrypted
   * if it is encrypted it will use the same function open encryted file does...no need to close out and use the other file chooser
 * save encrypted is not as nice as opening. You will need to use the save encrypted file, file chooser. This is because opening a file and asking for a password is less obtrusive as always asking if you want to encrypt a file while saving...sometimes you just need to save a file.
-* biggest security flaw right now is that a json object describes the encrypted data for all but EAX (others are in utf-8)....would need to check byte size of each part, put them in a file and read them from these unique sizes later on in order to be more secure. (I'M JUST REALLY DON'T WANT TO RIGHT NOW)
 * **Keep in mind selecting an encrpytion mode is only for saving.....when opening a file, the mode used to save will be called to decrypt the file regardless of what mode is selected.**
