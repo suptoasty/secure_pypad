@@ -1,1 +1,1 @@
-{"header": "header", "nonce": "DwzjkdycmzQ2BJvBLwMydg==", "ciphertext": "FF6FIPYZxgKSn4mMUXe4E74=", "tag": "+B3oVbJqnDKMgRe95ynJ/Q==", "encrypt": true, "mode": 11}
+{"nonce": "hcjy+VVyW2A4GINQKc1S5g==", "ciphertext": "FNw443k=", "tag": "t/O737mqr3lp8wX2okYOpw==", "encrypt": true, "mode": 9}

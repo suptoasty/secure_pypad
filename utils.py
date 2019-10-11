@@ -50,6 +50,7 @@ class password_dialog(QDialog):
 			warn.setText("Password Invalid")
 			warn.show()
 			return
+		#ideally would just use a signal, but don't know how
 		self.pas = self.hash_pass(self.password.text())
 
 		self.password.setText("")
@@ -62,7 +63,8 @@ class password_dialog(QDialog):
 		print("Rejected")
 
 	def __init__(self):
-		QMessageBox.__init__(self)
+		QDialog.__init__(self)
+		# super().__init__(self)
 
 		self.layout = QVBoxLayout()
 		self.password = QLineEdit()
@@ -152,7 +154,8 @@ class app(QApplication):
 				if(self.password_dialog.getEncryptionMode() == AES.MODE_EAX): mode = AES.MODE_EAX
 				self.openEncryptedFile(filename)
 			else:
-				self.text_edit.setText(data.decode('utf-8'))
+				# self.text_edit.setText(data.decode('utf-8'))
+				self.text_edit.setText(data)
 				file.close()		
 
 	def openFileEncrypted(self, password):
@@ -253,9 +256,14 @@ class app(QApplication):
 		elif(mode == AES.MODE_EAX):
 			cipher = AES.new(key, AES.MODE_EAX)
 			ciphertext, tag = cipher.encrypt_and_digest(data)
+			nonce = b64encode(cipher.nonce).decode("utf-8")
+			ct = b64encode(ciphertext).decode("utf-8")
+			tag = b64encode(tag).decode("utf-8")
+			result = json.dumps({"nonce":nonce, "ciphertext":ct, "tag": tag, "encrypt": True, 'mode': mode})
 
 			file_out = open(filename, "wb")
-			[file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
+			# [file_out.write(x) for x in (cipher.nonce, tag, ciphertext)]
+			file_out.write(bytes(result, "utf-8"))
 			file_out.close()
 		elif(mode == AES.MODE_GCM):
 			header = b"header"
@@ -268,19 +276,20 @@ class app(QApplication):
 			file_out = open(filename, "wb")
 			file_out.write(bytes(result, "utf-8"))
 			file_out.close()
-			header = ""
-			tag = ""
+			header = None
+			tag = None
+		key = None
 		b64 = None
 		cipher = None
 		pt = None
-		self.password_dialog.pas = ""
-		mode = 0
-		tag = ""
-		header = ""
+		self.password_dialog.pas = None
+		mode = None
+		tag = None
+		header = None
 		key = None
 		data = None
-		password = ""
-		filename = ""
+		password = None
+		filename = None
 		iv = None
 		ct = None
 		result = None
@@ -290,74 +299,76 @@ class app(QApplication):
 		if(err):
 			try:
 				file_in = open(filename, 'rb')
-				key = self.password_dialog.getPassword()
-				if(self.password_dialog.getEncryptionMode() == AES.MODE_EAX):
-					nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
+				key = self.password_dialog.getPassword()		
+				b64 = json.loads(file_in.read())
+				mode = b64["mode"]
+				if(mode == AES.MODE_CBC):
+					iv = b64decode(b64['iv'])
+					ct = b64decode(b64['ciphertext'])
+					cipher = AES.new(key, AES.MODE_CBC, iv)
+					pt = unpad(cipher.decrypt(ct), AES.block_size)
+					pt = pt.decode('utf-8')
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_CTR):
+					nonce = b64decode(b64['nonce'])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_CFB):
+					iv = b64decode(b64['iv'])
+					# nonce = b64decode(b64["nonce"])
+					ct = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_CFB, iv=iv)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_OFB):
+					# nonce = b64decode(b64['nonce'])
+					iv = b64decode(b64['iv'])
+					ct = b64decode(b64['ciphertext'])
+					cipher = AES.new(key, AES.MODE_OFB, iv=iv)
+					pt = cipher.decrypt(ct).decode("utf-8")
+					self.text_edit.setText(pt)
+					file_in.close()
+				elif(mode == AES.MODE_EAX):
+					# nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
+					nonce = b64decode(b64["nonce"])
+					ciphertext = b64decode(b64["ciphertext"])
+					tag = b64decode(b64["tag"])
 					cipher = AES.new(key, AES.MODE_EAX, nonce)
 					pt = cipher.decrypt_and_verify(ciphertext, tag)
 					self.text_edit.setText(pt.decode("utf-8"))
 					file_in.close()
-				else:
-					b64 = json.loads(file_in.read())
-					mode = b64["mode"]
-					if(mode == AES.MODE_CBC):
-						iv = b64decode(b64['iv'])
-						ct = b64decode(b64['ciphertext'])
-						cipher = AES.new(key, AES.MODE_CBC, iv)
-						pt = unpad(cipher.decrypt(ct), AES.block_size)
-						pt = pt.decode('utf-8')
-						self.text_edit.setText(pt)
-						file_in.close()
-					elif(mode == AES.MODE_CTR):
-						nonce = b64decode(b64['nonce'])
-						ct = b64decode(b64["ciphertext"])
-						cipher = AES.new(key, AES.MODE_CTR, nonce=nonce)
-						pt = cipher.decrypt(ct).decode("utf-8")
-						self.text_edit.setText(pt)
-						file_in.close()
-					elif(mode == AES.MODE_CFB):
-						iv = b64decode(b64['iv'])
-						# nonce = b64decode(b64["nonce"])
-						ct = b64decode(b64["ciphertext"])
-						cipher = AES.new(key, AES.MODE_CFB, iv=iv)
-						pt = cipher.decrypt(ct).decode("utf-8")
-						self.text_edit.setText(pt)
-						file_in.close()
-					elif(mode == AES.MODE_OFB):
-						# nonce = b64decode(b64['nonce'])
-						iv = b64decode(b64['iv'])
-						ct = b64decode(b64['ciphertext'])
-						cipher = AES.new(key, AES.MODE_OFB, iv=iv)
-						pt = cipher.decrypt(ct).decode("utf-8")
-						self.text_edit.setText(pt)
-						file_in.close()
-					elif(mode == AES.MODE_GCM):
-						# json_k = ["nonce", "header", "ciphertext", "tag"]
-						# jv = {k:b64decode(b64[k]) for k in json_k}
-						header = b64["header"].encode("utf-8")
-						tag = b64decode(b64["tag"])
-						nonce = b64decode(b64['nonce'])
-						ciphertext = b64decode(b64["ciphertext"])
-						cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-						cipher.update(header)
-						pt = cipher.decrypt_and_verify(ciphertext, tag)
-						self.text_edit.setText(pt.decode("utf-8"))
-						file_in.close()
+				elif(mode == AES.MODE_GCM):
+					# json_k = ["nonce", "header", "ciphertext", "tag"]
+					# jv = {k:b64decode(b64[k]) for k in json_k}
+					header = b64["header"].encode("utf-8")
+					tag = b64decode(b64["tag"])
+					nonce = b64decode(b64['nonce'])
+					ciphertext = b64decode(b64["ciphertext"])
+					cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+					cipher.update(header)
+					pt = cipher.decrypt_and_verify(ciphertext, tag)
+					self.text_edit.setText(pt.decode("utf-8"))
+					file_in.close()
 			except KeyError:
 				print("Key Error")
 			except ValueError:
 				print("Inccorrect Decrypt")
-			password = ""
+			password = None
 			key = None
 			b64 = None
 			iv = None
 			ct = None
 			cipher = None
 			pt = None
-			self.password_dialog.pas = ""
-			filename = ""
-		password = ""
-		filename = ""
+			self.password_dialog.pas = None
+			filename = None
+		password = None
+		filename = None
 
 	def hash_pass(self, pas)-> bytes:
 		sha = SHA256.new()
